@@ -1,0 +1,24 @@
+# Argo CD Application for the production environment.
+#
+# Automated sync is deliberately omitted. Production sync is triggered manually after the
+# GitOps pull request is approved, so that promotion is an explicit act with a named
+# approver rather than a consequence of a merge.
+#
+# Render with scripts/utility/render-gitops.py rather than editing by hand.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: <APP_NAME>-prod
+  namespace: openshift-gitops
+spec:
+  project: <APP_PROJECT_NAME>
+  source:
+    repoURL: "<GITOPS_REPO_URL>"
+    targetRevision: main
+    path: "<GITOPS_PROD_PATH>"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: "<NAMESPACE_PREFIX>-prod"
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false

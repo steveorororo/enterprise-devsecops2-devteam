@@ -1,0 +1,104 @@
+# Dependabot has two independent behaviours, and this file controls only one of them.
+#
+# Version updates: scheduled pull requests that move dependencies to newer releases whether
+# or not a vulnerability is known. Those are configured here, and only for the ecosystems
+# listed below.
+#
+# Security updates: pull requests raised when a known vulnerability is published for a
+# dependency you already use. Those are not configured in this file. They require Dependency
+# graph and Dependabot alerts to be enabled under repository Settings, Code security. An
+# ecosystem absent from this file still receives security updates once those settings are on.
+#
+# Application dependencies are not covered by default because no application ships with this
+# template. Uncomment the block matching your stack and set directory to your application
+# path, the same path set as application.path in config/pipeline.yaml.
+version: 2
+updates:
+  # npm
+  # - package-ecosystem: npm
+  #   directory: /<your-app-directory>
+  #   schedule:
+  #     interval: weekly
+  #   labels:
+  #     - dependencies
+
+  # pip
+  # - package-ecosystem: pip
+  #   directory: /<your-app-directory>
+  #   schedule:
+  #     interval: weekly
+  #   labels:
+  #     - dependencies
+
+  # Maven
+  # - package-ecosystem: maven
+  #   directory: /<your-app-directory>
+  #   schedule:
+  #     interval: weekly
+  #   labels:
+  #     - dependencies
+
+  # Gradle
+  # - package-ecosystem: gradle
+  #   directory: /<your-app-directory>
+  #   schedule:
+  #     interval: weekly
+  #   labels:
+  #     - dependencies
+
+  # NuGet
+  # - package-ecosystem: nuget
+  #   directory: /<your-app-directory>
+  #   schedule:
+  #     interval: weekly
+  #   labels:
+  #     - dependencies
+
+  # Go modules
+  # - package-ecosystem: gomod
+  #   directory: /<your-app-directory>
+  #   schedule:
+  #     interval: weekly
+  #   labels:
+  #     - dependencies
+
+  # Terraform
+  # - package-ecosystem: terraform
+  #   directory: /<your-app-directory>
+  #   schedule:
+  #     interval: weekly
+  #   labels:
+  #     - dependencies
+
+  # Bundler
+  # - package-ecosystem: bundler
+  #   directory: /<your-app-directory>
+  #   schedule:
+  #     interval: weekly
+  #   labels:
+  #     - dependencies
+
+  # Cargo
+  # - package-ecosystem: cargo
+  #   directory: /<your-app-directory>
+  #   schedule:
+  #     interval: weekly
+  #   labels:
+  #     - dependencies
+
+  # Active by default: the pipeline's Python dependency, the container base image,
+  # and the pipeline's own actions.
+  - package-ecosystem: pip
+    directory: /scripts
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /build
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The image reference is declared in the overlays. Promotion binds the approved digest in a
+# temporary copy before rendering desired state; it does not mutate this source tree.
+#
+# HorizontalPodAutoscaler and PodDisruptionBudget are not here. Both are useful for some
+# applications and unnecessary for others; see deploy/optional/README.md to enable either.
+resources:
+  - deployment.yaml
+  - service.yaml
+  - serviceaccount.yaml
+  - route.yaml
+  - configmap.yaml
+  - ../network-policies

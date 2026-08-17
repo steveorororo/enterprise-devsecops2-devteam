@@ -1,0 +1,38 @@
+# Which jobs the pull request gate requires, and which may legitimately skip.
+#
+# Severity thresholds are not set here. Each scanner enforces its own, through the input
+# that actually controls it, and duplicating those values in a second file produces a
+# number that looks authoritative but changes nothing:
+#
+#   Trivy dependencies   severity + exit-code   .github/workflows/pr-validate.yml
+#   Trivy image          severity + exit-code   .github/workflows/build-scan-publish.yml
+#   Checkov              soft-fail: false       security/iac/.checkov.yaml
+#   kube-linter          check severity          security/iac/.kube-linter.yaml
+#   gitleaks             exit-code               .github/workflows/pr-validate.yml
+#   CodeQL               code_scanning rule       .github/rulesets/main-branch.json
+#
+# Critical and High blocking is the starting position. Agree the thresholds with your
+# security owners and tune them at the tool once real finding volume is known. Blocking on
+# Medium from day one is usually noisy enough that developers learn to ignore the gate.
+
+# Jobs that must be present in the workflow. If one is deleted, the gate fails rather than
+# silently losing the control.
+required_jobs:
+  - unit-tests
+  - secrets-scan
+  - sca-trivy-fs
+  - dependency-review
+  - iac-checkov
+  - manifest-lint
+  - codeql
+
+# Jobs permitted to skip without failing the gate, because config/pipeline.yaml can
+# legitimately leave them unconfigured. Anything not listed here must actually run.
+skippable_jobs:
+  - unit-tests
+  - sca-trivy-fs
+
+# Trivy application suppressions use security/suppressions/ and are machine-linked to the
+# active ignore entry. The fixed Checkov baseline is validated separately. Other scanners do
+# not ship a generic template-level bypass; use the security owner's approved exception
+# process rather than adding an ungoverned ignore.

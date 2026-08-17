@@ -1,0 +1,83 @@
+# Per-application pipeline configuration. The workflows read these values, so this is the
+# file to edit rather than the workflow YAML.
+
+application:
+  # Path to the application source, relative to the repository root. Scanning, building,
+  # and the build commands below all run against this directory.
+  path: "<your-app-directory>"
+  # Informational only. Recorded so a reader can tell what the repository builds.
+  runtime: "<language>"
+
+build:
+  # Commands run by the unit-tests job, in this order, from application.path. Leave a
+  # command empty to skip that step.
+  #
+  # Avoid dependency lifecycle or build hooks where the ecosystem provides a safe mode.
+  # For example, npm supports `npm ci --ignore-scripts`. Do not assume another package
+  # manager has an equivalent flag. Python source-distribution builds can execute build
+  # backends during installation, so `pip --no-build-isolation` is not a script-blocking
+  # control. Prefer locked, integrity-checked dependencies and prebuilt packages where the
+  # ecosystem supports them.
+  #
+  # This pull request job is deliberately secretless and limited to contents: read because
+  # application tests and some dependency installation paths execute untrusted code by
+  # design. A scanner result is not a sandbox boundary.
+  install: ""
+  lint: ""
+  test: ""
+  compile: ""
+
+languages:
+  # CodeQL language list. The workflow selects the appropriate build mode and runner for
+  # each language. Valid values: actions, c-cpp, csharp, go, java-kotlin,
+  # javascript-typescript, python, ruby, rust, swift.
+  #
+  # Swift uses a macOS runner. Go and java-kotlin use CodeQL autobuild. Other supported
+  # languages use no-build extraction.
+  #
+  # Keep actions in the list. It analyses the workflow files in this repository, so a
+  # change that introduces an injection or an over-scoped token is caught by the same
+  # mechanism that scans application code.
+  codeql:
+    - actions
+    - javascript-typescript
+
+gitops:
+  # The repository holding the deployed desired state, as owner/name. Argo CD watches this
+  # repository, not this one. A merge to main opens a pull request against it rather than
+  # deploying, so the deployment decision stays a reviewed change with its own approvers.
+  #
+  # The convention is a per-team repository named tenant-gitops-<licence-plate>. Confirm
+  # the owning organisation and the naming standard with the platform team before setting
+  # this; both are open decisions recorded in docs/decisions.md.
+  repository: "<org>/tenant-gitops-<licence-plate>"
+  # Directory within that repository that the dev Argo CD Application watches. It must end
+  # in /dev; the GitOps renderer derives sibling test and prod paths from the same parent.
+  # Promotion replaces <path> as generated desired state and writes <path>/manifests.yaml.
+  path: "apps/dev"
+
+sonar:
+  # Off by default. CodeQL is the primary static analysis capability and publishes into
+  # the Security tab without an external account. Enable this only if your team already
+  # uses SonarQube Cloud: it needs the settings in security/sast/sonar-project.properties
+  # and a SONAR_TOKEN secret, and it reports into a second interface.
+  enabled: false
+
+sca:
+  # Dependabot is configured in .github/dependabot.yml and runs independently of the
+  # pull request pipeline, so it has no flag here.
+  trivy_fs: true
+
+signing:
+  # Off by default. The approved signing mechanism, the admission controller that verifies
+  # the signature, and the owner of the verification policy are all unresolved; see the
+  # open decisions in docs/decisions.md. Enabling this produces a signature nothing
+  # currently verifies, which is a supply chain claim without an enforcement point.
+  #
+  # SBOM generation is unconditional and does not depend on this flag.
+  enabled: false
+
+
+promotion:
+  # One image is built, scanned, and promoted by digest through every environment.
+  strategy: same-digest

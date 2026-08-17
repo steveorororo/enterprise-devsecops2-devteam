@@ -1,0 +1,52 @@
+# Credentials and key material. This file is a control for every repository that adopts
+# the template, so it covers more than this repository currently produces.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+kubeconfig
+.kube/
+.npmrc
+**/docker/config.json
+*.local.yaml
+*.local.yml
+
+# Scanner and build output
+*.sarif
+results.sarif
+rendered/
+coverage/
+dist/
+node_modules/
+charts/*.tgz
+
+# Terraform state, which frequently contains secrets in plain text
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+
+# Language and tool caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Editor and operating system
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Scratch files
+*.bak
+*.tmp
+*.old
+*.log
+
+# Local working directory, not published
+.local/
+internal-notes.md

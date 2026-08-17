@@ -1,0 +1,24 @@
+# Argo CD Application for the test environment. Promotion into test is a reviewed change
+# to apps/test in the GitOps repository, carrying the same digest that passed dev.
+#
+# Render with scripts/utility/render-gitops.py rather than editing by hand.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: <APP_NAME>-test
+  namespace: openshift-gitops
+spec:
+  project: <APP_PROJECT_NAME>
+  source:
+    repoURL: "<GITOPS_REPO_URL>"
+    targetRevision: main
+    path: "<GITOPS_TEST_PATH>"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: "<NAMESPACE_PREFIX>-test"
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

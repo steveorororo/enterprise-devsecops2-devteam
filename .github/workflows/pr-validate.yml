@@ -1,0 +1,273 @@
+name: PR Validate
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: pr-validate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # config/pipeline.yaml is the single place a team declares its application and selects
+  # which optional controls run. Every job below reads from here.
+  config:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      app_path: ${{ steps.read.outputs.app_path }}
+      app_configured: ${{ steps.read.outputs.app_configured }}
+      build_configured: ${{ steps.read.outputs.build_configured }}
+      build_install: ${{ steps.read.outputs.build_install }}
+      build_lint: ${{ steps.read.outputs.build_lint }}
+      build_test: ${{ steps.read.outputs.build_test }}
+      build_compile: ${{ steps.read.outputs.build_compile }}
+      codeql_matrix: ${{ steps.read.outputs.codeql_matrix }}
+      trivy_fs_enabled: ${{ steps.read.outputs.trivy_fs_enabled }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - id: read
+        run: |
+          python3 -m pip install --quiet --require-hashes -r scripts/requirements-ci.txt
+          python3 scripts/utility/read-pipeline-config.py >> "$GITHUB_OUTPUT"
+          python3 scripts/security/validate-suppressions.py
+
+  # Runs the application's own build commands. Skips until config/pipeline.yaml declares
+  # them, which is why this job is listed under skippable_jobs.
+  unit-tests:
+    needs: config
+    if: needs.config.outputs.build_configured == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ${{ needs.config.outputs.app_path }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      # Each command is passed through the environment rather than expanded into the shell
+      # by the expression evaluator, so its content is data to the runner rather than
+      # workflow syntax.
+      #
+      # Avoid package-manager lifecycle or build hooks where the ecosystem provides a safe
+      # mode. This job is intentionally secretless and limited to contents: read because
+      # application tests and some dependency installation paths execute untrusted code by
+      # design. A scanner result is not a sandbox boundary.
+      - if: needs.config.outputs.build_install != ''
+        run: sh -c "$BUILD_COMMAND"
+        env:
+          BUILD_COMMAND: ${{ needs.config.outputs.build_install }}
+      - if: needs.config.outputs.build_lint != ''
+        run: sh -c "$BUILD_COMMAND"
+        env:
+          BUILD_COMMAND: ${{ needs.config.outputs.build_lint }}
+      - if: needs.config.outputs.build_test != ''
+        run: sh -c "$BUILD_COMMAND"
+        env:
+          BUILD_COMMAND: ${{ needs.config.outputs.build_test }}
+      - if: needs.config.outputs.build_compile != ''
+        run: sh -c "$BUILD_COMMAND"
+        env:
+          BUILD_COMMAND: ${{ needs.config.outputs.build_compile }}
+
+  secrets-scan:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          set -euo pipefail
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "${archive}" "${base}/${archive}"
+          curl -sSfL -o checksums.txt "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " ${archive}\$" checksums.txt | sha256sum -c -
+          tar -xzf "${archive}" gitleaks
+          sudo mv gitleaks /usr/local/bin/
+      - name: Scan for secrets
+        run: gitleaks detect --source . --redact --exit-code 1
+
+  sca-trivy-fs:
+    needs: config
+    if: needs.config.outputs.trivy_fs_enabled == 'true' && needs.config.outputs.app_configured == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: ${{ needs.config.outputs.app_path }}
+          format: sarif
+          output: trivy-fs.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          trivyignores: security/sca/.trivyignore
+      - uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        if: always()
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  # Compares the dependency manifests either side of the pull request and fails on a newly
+  # introduced vulnerable or disallowed dependency. Complements the Trivy scan: this one
+  # sees what the change adds, rather than the state of the tree afterwards.
+  #
+  # Requires Dependency graph to be enabled under Settings, Code security. The job fails
+  # rather than skips if it is off, because a silently absent check is worse than a loud one.
+  dependency-review:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@3b139cfc5fae8b618d3eae3675e383bb1769c019 # v4.5.0
+        with:
+          fail-on-severity: high
+
+  iac-checkov:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Render manifests
+        env:
+          KUSTOMIZE_VERSION: 5.4.3
+        run: |
+          set -euo pipefail
+          base="https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}"
+          archive="kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          curl -sSfL -o "${archive}" "${base}/${archive}"
+          curl -sSfL -o checksums.txt "${base}/checksums.txt"
+          grep " ${archive}\$" checksums.txt | sha256sum -c -
+          tar -xzf "${archive}" kustomize
+          sudo mv kustomize /usr/local/bin/
+          mkdir -p rendered
+          for env in dev test prod; do
+            kustomize build "deploy/overlays/${env}" > "rendered/${env}.yaml"
+          done
+          cp build/Dockerfile rendered/Dockerfile
+      # Scans rendered output. Namespace assignment and the image reference do not exist
+      # until Kustomize has resolved them, so those checks cannot evaluate raw base and
+      # overlay files.
+      - uses: bridgecrewio/checkov-action@9b70310bcd306d11740313070b940167d6b23085 # v12.3115.0
+        with:
+          directory: rendered
+          config_file: security/iac/.checkov.yaml
+          output_format: sarif
+          output_file_path: checkov.sarif
+          soft_fail: false
+      - uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        if: always()
+        with:
+          sarif_file: checkov.sarif
+          category: checkov
+
+  manifest-lint:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Install kube-linter
+        env:
+          KUBE_LINTER_VERSION: 0.8.3
+        run: |
+          set -euo pipefail
+          base="https://github.com/stackrox/kube-linter/releases/download/v${KUBE_LINTER_VERSION}"
+          curl -sSfL -o kube-linter-linux "${base}/kube-linter-linux"
+          curl -sSfL -o kube-linter-linux.sigstore.json "${base}/kube-linter-linux.sigstore.json"
+          # kube-linter publishes a Sigstore bundle rather than a checksum file. Verifying
+          # the signature binds the binary to the project's release workflow.
+          cosign verify-blob \
+            --bundle kube-linter-linux.sigstore.json \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github\.com/stackrox/kube-linter/' \
+            kube-linter-linux
+          chmod +x kube-linter-linux
+          sudo mv kube-linter-linux /usr/local/bin/kube-linter
+      - name: Render and lint
+        env:
+          KUSTOMIZE_VERSION: 5.4.3
+        run: |
+          set -euo pipefail
+          base="https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}"
+          archive="kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          curl -sSfL -o "${archive}" "${base}/${archive}"
+          curl -sSfL -o checksums.txt "${base}/checksums.txt"
+          grep " ${archive}\$" checksums.txt | sha256sum -c -
+          tar -xzf "${archive}" kustomize
+          sudo mv kustomize /usr/local/bin/
+          for env in dev test prod; do
+            kustomize build "deploy/overlays/${env}" \
+              | kube-linter lint --config security/iac/.kube-linter.yaml -
+          done
+
+  codeql:
+    needs: config
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      matrix: ${{ fromJSON(needs.config.outputs.codeql_matrix) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build_mode }}
+          config-file: ./security/sast/codeql-config.yml
+      - uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          category: codeql-${{ matrix.language }}
+
+  # The single check branch protection requires. Adding a job to this workflow means adding
+  # it to needs below and to required_jobs in config/security-gate.yaml, or the gate cannot
+  # see its result.
+  gate:
+    needs: [config, unit-tests, secrets-scan, sca-trivy-fs, dependency-review, iac-checkov,
+            manifest-lint, codeql]
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - run: |
+          python3 -m pip install --quiet --require-hashes -r scripts/requirements-ci.txt
+          python3 scripts/security/evaluate-gate.py --needs "$NEEDS"
+        env:
+          NEEDS: ${{ toJSON(needs) }}

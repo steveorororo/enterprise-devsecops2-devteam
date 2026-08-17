@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: app
+spec:
+  maxUnavailable: 1
+  # Unhealthy pods are evicted regardless of the budget, so a fully broken rollout cannot
+  # block node drains and cluster maintenance.
+  unhealthyPodEvictionPolicy: AlwaysAllow
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: app

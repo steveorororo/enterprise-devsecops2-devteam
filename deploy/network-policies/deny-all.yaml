@@ -1,0 +1,18 @@
+# Deny-by-default baseline, selecting this application's own pods so the policy stays
+# within the boundary of the workload it belongs to and leaves other tenants of a shared
+# namespace untouched.
+#
+# Ingress and egress both start closed. Traffic the application needs is granted by an
+# explicit allow policy alongside this one, so a missing rule surfaces as a failed
+# connection rather than as unrestricted access.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-deny-all
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: app
+  policyTypes:
+    - Ingress
+    - Egress

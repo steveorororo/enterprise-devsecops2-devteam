@@ -1,0 +1,25 @@
+# Argo CD Application for the dev environment. Points at the GitOps repository, not this
+# one: this repository produces the image and opens the pull request that updates the
+# GitOps repository, and never talks to the cluster directly.
+#
+# Render with scripts/utility/render-gitops.py rather than editing by hand.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: <APP_NAME>-dev
+  namespace: openshift-gitops
+spec:
+  project: <APP_PROJECT_NAME>
+  source:
+    repoURL: "<GITOPS_REPO_URL>"
+    targetRevision: main
+    path: "<GITOPS_DEV_PATH>"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: "<NAMESPACE_PREFIX>-dev"
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

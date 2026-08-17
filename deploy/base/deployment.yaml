@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app.kubernetes.io/name: app
+spec:
+  # Remove this when the optional HorizontalPodAutoscaler is enabled, so the two do not
+  # compete for ownership of the replica count. See deploy/optional/README.md.
+  replicas: 2
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: app
+    spec:
+      terminationGracePeriodSeconds: 30
+      serviceAccountName: app
+      # Set on the pod as well as the ServiceAccount: the pod-level setting is what the
+      # kubelet honours, and it survives a ServiceAccount the platform may recreate.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: app # rebound by the overlay's images: transformer to a digest reference
+          # Digest references are immutable, so this only forces a registry auth check on
+          # every pull rather than an actual re-download.
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: app-config
+          # Secret values are referenced, never inlined. Create the Secret out of band
+          # (platform-managed or from the runtime secret store) and uncomment:
+          # env:
+          #   - name: DATABASE_PASSWORD
+          #     valueFrom:
+          #       secretKeyRef:
+          #         name: app-secrets
+          #         key: database-password
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+              # CPU is deliberately unlimited so containers can burst into unallocated node
+              # capacity. A CPU limit throttles aggressively under load; the request still
+              # guarantees the floor the scheduler reserves.
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi

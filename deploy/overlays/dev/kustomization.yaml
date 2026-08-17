@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: "<your-namespace>-dev"
+
+resources:
+  - ../../base
+
+# newName is the registry path from config/registry.yaml, set once during adoption.
+#
+# digest is a source placeholder in the correct format. Promotion copies this deployment
+# source to a temporary workspace, replaces the placeholder there, and writes rendered desired
+# state to the GitOps repository. The source file remains unchanged.
+#
+# The placeholder lets policy checks validate digest-shaped references on the first pull
+# request. It resolves to nothing, so an unpromoted render fails closed.
+images:
+  - name: app
+    newName: "<set-by-registry-config>"
+    digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"

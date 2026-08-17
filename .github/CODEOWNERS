@@ -1,0 +1,16 @@
+# Code owner rules are disabled by default. Every rule below is commented out, so no
+# code owner review is required until a team deliberately enables one.
+#
+# To enforce code owner review: uncomment the rules you want and replace the placeholder
+# handles with real GitHub teams or users. A handle that does not resolve cannot approve,
+# so an active rule with a placeholder blocks every pull request permanently.
+#
+# Branch protection can require code owner review before this file is configured. With no
+# active rule, no path has an owner, so there is nothing to satisfy and nothing to fail.
+
+# *                           @your-org/app-team
+
+# /security/                 @your-org/appsec-team
+# /config/security-gate.yaml @your-org/appsec-team
+# /.github/workflows/        @your-org/app-team @your-org/appsec-team
+# /gitops/                   @your-org/app-team @your-org/platform-team

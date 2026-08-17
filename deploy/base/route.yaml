@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: app
+spec:
+  # host is set per environment in the overlay. Left unset here, OpenShift generates one
+  # from the route name, namespace, and cluster ingress domain.
+  to:
+    kind: Service
+    name: app
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

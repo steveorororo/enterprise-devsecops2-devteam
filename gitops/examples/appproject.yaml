@@ -1,0 +1,43 @@
+# Scoped project for this application. Source repositories, destination namespaces, and
+# resource kinds are restricted to the ones this application uses, which is the boundary
+# that makes GitOps promotion auditable. The built-in default project permits any source
+# and any destination.
+#
+# Render with scripts/utility/render-gitops.py rather than editing by hand. Agree with the
+# platform team whether AppProject definitions are owned by the application team or by them.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: <APP_PROJECT_NAME>
+  namespace: openshift-gitops
+spec:
+  description: Deployment project for <APP_NAME>
+  sourceRepos:
+    - "<GITOPS_REPO_URL>"
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: <NAMESPACE_PREFIX>-dev
+    - server: https://kubernetes.default.svc
+      namespace: <NAMESPACE_PREFIX>-test
+    - server: https://kubernetes.default.svc
+      namespace: <NAMESPACE_PREFIX>-prod
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: ConfigMap
+    - group: route.openshift.io
+      kind: Route
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: batch
+      kind: Job

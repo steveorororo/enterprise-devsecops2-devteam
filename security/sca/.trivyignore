@@ -1,0 +1,3 @@
+# Format: <CVE-or-ID> # SUPP-YYYY-NNN
+# Empty by default. Add entries only through the suppression process in
+# security/suppressions/README.md, not by editing this file directly in a PR.

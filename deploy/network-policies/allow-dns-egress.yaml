@@ -1,0 +1,49 @@
+# app-deny-all blocks egress, so without this the application cannot resolve DNS at all.
+# Scoped to the cluster DNS namespace rather than all namespaces, which would permit
+# egress to every pod in the cluster on ports 53.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-allow-dns-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: app
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+# Egress beyond DNS is denied. Uncomment and scope the pattern you need.
+#
+# Application to database in the same namespace:
+#   egress:
+#     - to:
+#         - podSelector:
+#             matchLabels:
+#               app.kubernetes.io/name: database
+#       ports:
+#         - protocol: TCP
+#           port: 5432
+#
+# Application to another application in the same namespace:
+#   egress:
+#     - to:
+#         - podSelector:
+#             matchLabels:
+#               app.kubernetes.io/name: <other-app>
+#       ports:
+#         - protocol: TCP
+#           port: 8080
+#
+# Application to the OpenShift API server or an external endpoint requires an ipBlock or a
+# namespaceSelector for the target; confirm the correct destination for your cluster before
+# adding it, since the address differs per environment.

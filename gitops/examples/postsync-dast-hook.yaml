@@ -1,0 +1,75 @@
+# Optional Argo CD PostSync hook that triggers .github/workflows/dast-dev.yml after a dev sync.
+#
+# Confirm two platform details before relying on this example:
+#   1. how the synced revision is supplied when this hook is rendered;
+#   2. how the fine-grained dispatch token is provisioned into the namespace.
+#
+# The token must be limited to actions:write on the application repository. The DAST target
+# URL is not accepted from this Job. The workflow reads the trusted ZAP_DEV_URL repository
+# variable, so the hook cannot redirect the scanner to an arbitrary host.
+#
+# Render with scripts/utility/render-gitops.py rather than editing by hand.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dast-dispatch
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 180
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dispatch
+          image: curlimages/curl:8.10.1@sha256:d9b4541e214bcd85196d6e92e2753ac6d0ea699f0af5741f8c6cccbfcf00ef4b
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
+          env:
+            - name: GH_DISPATCH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dast-dispatch-token
+                  key: token
+            - name: SYNCED_REVISION
+              value: "<SYNCED_REVISION>"
+            - name: GH_REPO
+              value: "<GITHUB_REPO>"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              # render-gitops.py validates GH_REPO and SYNCED_REVISION before this manifest
+              # is written. printf treats the revision as data rather than a format string.
+              printf '{"ref":"main","inputs":{"revision":"%s"}}' "${SYNCED_REVISION}" \
+                > /tmp/payload.json
+              curl -sSf -X POST \
+                -H "Authorization: Bearer ${GH_DISPATCH_TOKEN}" \
+                -H "Accept: application/vnd.github+json" \
+                --data @/tmp/payload.json \
+                "https://api.github.com/repos/${GH_REPO}/actions/workflows/dast-dev.yml/dispatches"
+      volumes:
+        - name: tmp
+          emptyDir: {}

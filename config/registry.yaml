@@ -1,0 +1,37 @@
+# Image registry configuration.
+#
+# Change registry_type and fill in its block. Everything downstream (build-scan-publish.yml,
+# gitops-promote.yml, the deploy overlays) reads from here, so no registry-specific logic
+# belongs in a workflow file. Scanning, SBOM generation, and signing behave identically
+# whichever type is selected; only the push target and the credential change.
+#
+# Every <placeholder> must be replaced. scripts/utility/resolve-registry.py fails the build
+# if any survives, rather than letting it flow into an image reference.
+#
+# The authoritative registry for your organisation is an open decision; see
+# docs/decisions.md. ghcr is the default because it needs no cluster route and no
+# externally reachable registry endpoint, so a new repository can complete a build before
+# any platform request has been raised.
+registry_type: ghcr
+
+ghcr:
+  host: "ghcr.io"
+  org: "<your-org>"
+  # Username that owns the personal access token stored in REGISTRY_TOKEN. GitHub Container
+  # Registry authentication requires the real account name with the token as the password.
+  username: "<registry-username>"
+
+openshift-internal:
+  # The externally reachable registry route, not the in-cluster service address. A hosted
+  # GitHub Actions runner cannot resolve image-registry.openshift-image-registry.svc.
+  # Confirm the route for your cluster before use; it differs per environment.
+  host: "<registry-route-host>"
+  namespace: "<your-namespace>"
+  # Account name paired with the service account or user token stored in REGISTRY_TOKEN.
+  username: "<registry-username>"
+
+artifactory:
+  # Confirm the instance and repository path convention with the platform team before use.
+  host: "<artifactory-host>"
+  repository: "<repo-path>"
+  username: "<registry-username>"

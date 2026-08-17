@@ -1,0 +1,9 @@
+# Non-sensitive application configuration. Values that differ per environment are patched
+# from the overlay; anything secret belongs in a Secret and is referenced by secretKeyRef
+# in deployment.yaml, never inlined here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  LOG_LEVEL: "info"
