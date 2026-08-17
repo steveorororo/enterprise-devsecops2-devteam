@@ -1,0 +1,43 @@
+# Repository initialization, not application delivery. Run once after a repository is
+# created from this template, to apply the branch protection baseline in
+# .github/rulesets/main-branch.json. Manual dispatch only, and safe to re-run.
+#
+# Provisioning processes can call scripts/bootstrap/configure-repository.sh directly instead.
+# This workflow is a wrapper for repositories initialized from the GitHub UI.
+name: Repository Bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: repository-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  apply-ruleset:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      # The default GITHUB_TOKEN has no administration permission and cannot manage
+      # rulesets, so a provisioning credential is required. Checked before the script runs
+      # so the reason is obvious rather than surfacing as an authorization failure.
+      - name: Require the provisioning credential
+        run: |
+          if [ -z "${BOOTSTRAP_ADMIN_TOKEN}" ]; then
+            echo "::error::BOOTSTRAP_ADMIN_TOKEN is not configured. Repository initialization needs a token with repository Administration: write." >&2
+            exit 1
+          fi
+        env:
+          BOOTSTRAP_ADMIN_TOKEN: ${{ secrets.BOOTSTRAP_ADMIN_TOKEN }}
+
+      - name: Apply branch protection baseline
+        run: scripts/bootstrap/configure-repository.sh
+        env:
+          GH_TOKEN: ${{ secrets.BOOTSTRAP_ADMIN_TOKEN }}

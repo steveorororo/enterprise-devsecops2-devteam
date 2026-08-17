@@ -19,14 +19,30 @@ reconciliation. This repository does not run `oc apply`, `helm upgrade`, or `arg
 - A separate GitOps repository.
 - Registry and GitOps credentials stored as GitHub secrets.
 
+### Onboarding sequence
+
+```text
+1. Create repository from template
+2. Repository bootstrap runs
+3. main ruleset applied automatically
+4. Configure the required application files
+5. Create feature branch
+6. Open pull request
+7. Security validation and gate
+8. Approval
+9. Merge to main
+10. Build, scan, publish, GitOps promotion
+```
+
+Steps 2 and 3 are repository initialization and are covered under Repository protection,
+below. Steps 6 to 10 are the standing delivery path, detailed under Pipeline flow.
+
 ### Files you must configure
 
-**Seven mandatory files, plus one mandatory action.** Application teams should not edit
-`.github/workflows/` or `scripts/` for normal adoption. Editing `config/pipeline.yaml`,
-`config/registry.yaml`, `build/Dockerfile`, the three `deploy/overlays/*/kustomization.yaml`
-files, and `.github/dependabot.yml` covers the seven files. Importing
-`.github/rulesets/main-branch.json` (see GitHub configuration, below) is a distinct, eighth
-mandatory action: it is not a file edit, and the pipeline is not fully protected without it.
+**Seven mandatory files.** Application teams should not edit `.github/workflows/` or
+`scripts/` for normal adoption. Editing `config/pipeline.yaml`, `config/registry.yaml`,
+`build/Dockerfile`, the three `deploy/overlays/*/kustomization.yaml` files, and
+`.github/dependabot.yml` covers all seven.
 
 Optional files, edited only when the matching capability applies, include
 `.github/CODEOWNERS`, `security/sast/sonar-project.properties`,
@@ -44,7 +60,7 @@ For the complete setup checklist, see `docs/configuration-checklist.md`.
 4. Configure the target registry in `config/registry.yaml`.
 5. Set the namespace and image values in all three overlays.
 6. Enable the correct dependency ecosystem in `.github/dependabot.yml`.
-7. Import `.github/rulesets/main-branch.json` and enable the GitHub security features listed below.
+7. Enable the GitHub security features listed below.
 8. Set `gitops.repository` and `gitops.path` before the first merge to `main`.
 
 Unresolved placeholders fail or skip with an explicit message rather than silently deploying
@@ -78,12 +94,23 @@ The registry-returned image digest is the identifier used for final-image scanni
 association, optional signing, and GitOps promotion. The same image is promoted through
 development, test, and production. It is not rebuilt per environment.
 
-## GitHub configuration
+## Repository protection
 
-Import `.github/rulesets/main-branch.json` under repository rulesets. The baseline requires
-the `gate` status check, prevents force pushes and branch deletion, and applies CodeQL
-code-scanning protection. The included High-or-higher CodeQL threshold is a starting position
-and must be confirmed with the owning security team before broad use.
+The standard `main` branch protection baseline ships in `.github/rulesets/main-branch.json`.
+Repository initialization applies this ruleset automatically, so development teams do not
+normally configure branch protection by hand.
+
+The ruleset requires pull requests and the `gate` security check before changes reach `main`,
+requires code owner review, and prevents force pushes and branch deletion. The included
+High-or-higher CodeQL threshold is a starting position and must be confirmed with the owning
+security team before broad use.
+
+If initialization cannot apply the ruleset because the provisioning identity lacks the
+required GitHub permissions, the bootstrap reports the failure and exits non-zero. The
+repository must not be treated as fully initialized until the ruleset is active. Provisioning
+detail is in `docs/repository-bootstrap.md`.
+
+## GitHub configuration
 
 Enable these repository security capabilities where licensed and available:
 

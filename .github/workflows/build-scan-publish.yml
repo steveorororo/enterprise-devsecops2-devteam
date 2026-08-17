@@ -183,6 +183,11 @@ jobs:
       ${{ always() && needs.build.result == 'success' &&
           (needs.sign.result == 'success' || needs.sign.result == 'skipped') &&
           (needs.sonar.result == 'success' || needs.sonar.result == 'skipped') }}
+    # The called workflow's job requests contents: read. A called workflow cannot hold more
+    # than its caller, and the workflow-level default here is no permissions at all, so the
+    # call is declared explicitly rather than by widening the default.
+    permissions:
+      contents: read
     uses: ./.github/workflows/gitops-promote.yml
     with:
       digest: ${{ needs.build.outputs.digest }}

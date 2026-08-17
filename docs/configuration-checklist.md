@@ -74,9 +74,12 @@ a few README examples. There is no script for these, so edit them directly.
 
 ## GitHub configuration
 
-- **Import the branch ruleset** from `.github/rulesets/main-branch.json`. It requires the
-  `gate` status check and separately blocks High/Critical CodeQL security alerts. Confirm the
-  severity threshold with security owners before broad adoption.
+- **Confirm the branch ruleset is active.** Repository initialization applies
+  `.github/rulesets/main-branch.json` automatically, so there is no manual import step. The
+  ruleset requires the `gate` status check and separately blocks High/Critical CodeQL security
+  alerts. Confirm the severity threshold with security owners before broad adoption. If the
+  ruleset is absent under Settings, Rules, Rulesets, the repository was not fully initialized;
+  see `docs/repository-bootstrap.md`.
 - **Enable Dependency graph, Dependabot alerts, and secret scanning with push protection**
   under Settings, Code security. The `dependency-review` job fails without the dependency
   graph, and Dependabot security updates require alerts to be on.
