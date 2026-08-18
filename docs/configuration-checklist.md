@@ -80,6 +80,10 @@ a few README examples. There is no script for these, so edit them directly.
   alerts. Confirm the severity threshold with security owners before broad adoption. If the
   ruleset is absent under Settings, Rules, Rulesets, the repository was not fully initialized;
   see `docs/repository-bootstrap.md`.
+- **Turn off CodeQL default setup** under Settings, Code security, if it is enabled. This
+  template ships an advanced CodeQL configuration in `pr-validate.yml`, and GitHub rejects
+  advanced-configuration results while default setup is active, which fails the `codeql` job
+  and the gate.
 - **Enable Dependency graph, Dependabot alerts, and secret scanning with push protection**
   under Settings, Code security. The `dependency-review` job fails without the dependency
   graph, and Dependabot security updates require alerts to be on.

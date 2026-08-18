@@ -68,6 +68,12 @@ job results into the single required status check. CodeQL is handled differently
 succeed while publishing alerts, so the branch ruleset's `code_scanning` rule enforces CodeQL
 alert severity separately.
 
+A configured CodeQL language is analysed once the repository contains source for it. Until
+then that language reports no analysis, so a repository does not fail its first pull request
+for having no application code yet. The first commit adding matching source makes analysis run
+again with no configuration change, and a failure from that point blocks the pull request.
+Workflow files are always present, so the `actions` language is always analysed.
+
 The `code_scanning` rule in `.github/rulesets/main-branch.json` names CodeQL only; it does not
 cover Trivy or Checkov, even though both also upload SARIF to the Security tab. Trivy and
 Checkov are enforced through in-job failure instead: Trivy's `exit-code: "1"` at
