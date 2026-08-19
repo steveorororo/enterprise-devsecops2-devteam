@@ -92,11 +92,18 @@ a few README examples. There is no script for these, so edit them directly.
   deadlock pull requests; the ruleset's code-owner requirement only applies where a real rule
   matches.
 
+## Platform release
+
+- **Do not hand edit `config/platform.yaml`.** It records the AppSec platform release this
+  repository executes. Automated update pull requests move the recorded version and every
+  pinned commit together, and the platform rejects a consumer where the two disagree.
+
 ## Security gates
 
 - **Agree the blocking severities** with your security owners. Critical and High is the
   starting position, not an agreed standard. Scanner thresholds live at their scanners;
-  CodeQL's High-or-higher threshold lives in `.github/rulesets/main-branch.json`.
+  CodeQL's High-or-higher threshold lives in `.github/rulesets/main-branch.json`. Scanner
+  thresholds that are the same for every consumer are maintained by the AppSec platform.
 - **Decide whether ignoring unfixed vulnerabilities is acceptable.** Both Trivy jobs run with
   `ignore-unfixed: true`. Open decision.
 - **Confirm `seccompProfile: RuntimeDefault` against your cluster's SCC.** The legacy

@@ -9,6 +9,12 @@ GitHub Actions performs CI only. It builds, tests, scans, publishes the approved
 opens a pull request against the GitOps repository. Argo CD performs deployment and
 reconciliation. This repository does not run `oc apply`, `helm upgrade`, or `argocd app sync`.
 
+Pull request security controls are executed by the central AppSec platform rather than
+implemented here. This repository pins the platform release it consumes in
+`config/platform.yaml`, and the pull request workflow calls that release at an immutable
+commit. Scanner versions, verification and policy are maintained centrally, so adopting a
+security fix is a reviewed pointer update rather than a re-implementation.
+
 ## Start here
 
 ### Prerequisites
@@ -93,6 +99,22 @@ Merge to main
 The registry-returned image digest is the identifier used for final-image scanning, SBOM
 association, optional signing, and GitOps promotion. The same image is promoted through
 development, test, and production. It is not rebuilt per environment.
+
+## Platform releases
+
+`config/platform.yaml` records the platform release this repository executes:
+
+```text
+platform_version   human readable release
+platform_ref       the commit the workflows actually run
+```
+
+Both move together in one reviewed change, so this repository cannot execute one release
+while reporting another. A repository keeps running its pinned commit until it adopts an
+update, so a central fix reaches this repository when its update pull request is merged.
+
+Do not edit these values by hand or point a workflow at a branch. The platform rejects a
+consumer whose recorded release and pinned commits disagree.
 
 ## Repository protection
 
@@ -246,8 +268,9 @@ mechanism.
 
 ## Validation
 
-`scripts/validation/validate-manifests.sh` renders every overlay and lints the result; it is
-reusable by adopting teams for a local check before opening a pull request.
+`scripts/validation/validate-manifests.sh` renders every overlay and lints the result before
+you open a pull request. It fetches the check configuration from the pinned platform release,
+so local results match CI.
 
 The broader regression suite used to validate changes to the template itself (not to an
 application built from it) is maintained separately from this repository and is not part of
