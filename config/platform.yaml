@@ -1,0 +1,12 @@
+# Which release of the central AppSec platform this repository executes.
+#
+# platform_version is the human readable release. platform_ref is the commit the workflows
+# actually run, and is the execution identity. Both move together in a single reviewed change,
+# so this repository can never claim one release while executing another.
+#
+# Not the same as the template generation this repository was created from. A repository keeps
+# executing its pinned commit until it adopts a new release.
+
+platform_repository: steveorororo/enterprise-devsecops2-appsec
+platform_version: "1.0.1"
+platform_ref: 1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
