@@ -10,6 +10,10 @@ concurrency:
   group: pr-validate-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+# Security controls are executed by the central AppSec platform at an immutable commit. The
+# job ids below are the security gate contract in config/security-gate.yaml and do not change
+# when an implementation moves.
+
 jobs:
   # config/pipeline.yaml is the single place a team declares its application and selects
   # which optional controls run. Every job below reads from here.
@@ -78,55 +82,22 @@ jobs:
           BUILD_COMMAND: ${{ needs.config.outputs.build_compile }}
 
   secrets-scan:
-    runs-on: ubuntu-24.04
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/secret-scanning.yml@d9694938ede6159cc4eea9d2e6f06ae819319592
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Install gitleaks
-        env:
-          GITLEAKS_VERSION: 8.30.1
-        run: |
-          set -euo pipefail
-          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
-          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          curl -sSfL -o "${archive}" "${base}/${archive}"
-          curl -sSfL -o checksums.txt "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
-          grep " ${archive}\$" checksums.txt | sha256sum -c -
-          tar -xzf "${archive}" gitleaks
-          sudo mv gitleaks /usr/local/bin/
-      - name: Scan for secrets
-        run: gitleaks detect --source . --redact --exit-code 1
+    with:
+      platform_ref: d9694938ede6159cc4eea9d2e6f06ae819319592
 
   sca-trivy-fs:
     needs: config
     if: needs.config.outputs.trivy_fs_enabled == 'true' && needs.config.outputs.app_configured == 'true'
-    runs-on: ubuntu-24.04
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/dependency-security.yml@d9694938ede6159cc4eea9d2e6f06ae819319592
     permissions:
       contents: read
       security-events: write
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: fs
-          scan-ref: ${{ needs.config.outputs.app_path }}
-          format: sarif
-          output: trivy-fs.sarif
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          ignore-unfixed: true
-          trivyignores: security/sca/.trivyignore
-      - uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
-        if: always()
-        with:
-          sarif_file: trivy-fs.sarif
-          category: trivy-fs
+    with:
+      platform_ref: d9694938ede6159cc4eea9d2e6f06ae819319592
+      scan_path: ${{ needs.config.outputs.app_path }}
 
   # Compares the dependency manifests either side of the pull request and fails on a newly
   # introduced vulnerable or disallowed dependency. Complements the Trivy scan: this one
@@ -135,101 +106,36 @@ jobs:
   # Requires Dependency graph to be enabled under Settings, Code security. The job fails
   # rather than skips if it is off, because a silently absent check is worse than a loud one.
   dependency-review:
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - uses: actions/dependency-review-action@3b139cfc5fae8b618d3eae3675e383bb1769c019 # v4.5.0
-        with:
-          fail-on-severity: high
-
-  iac-checkov:
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - name: Render manifests
-        env:
-          KUSTOMIZE_VERSION: 5.4.3
-        run: |
-          set -euo pipefail
-          base="https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}"
-          archive="kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
-          curl -sSfL -o "${archive}" "${base}/${archive}"
-          curl -sSfL -o checksums.txt "${base}/checksums.txt"
-          grep " ${archive}\$" checksums.txt | sha256sum -c -
-          tar -xzf "${archive}" kustomize
-          sudo mv kustomize /usr/local/bin/
-          mkdir -p rendered
-          for env in dev test prod; do
-            kustomize build "deploy/overlays/${env}" > "rendered/${env}.yaml"
-          done
-          cp build/Dockerfile rendered/Dockerfile
-      # Scans rendered output. Namespace assignment and the image reference do not exist
-      # until Kustomize has resolved them, so those checks cannot evaluate raw base and
-      # overlay files.
-      - uses: bridgecrewio/checkov-action@9b70310bcd306d11740313070b940167d6b23085 # v12.3115.0
-        with:
-          directory: rendered
-          config_file: security/iac/.checkov.yaml
-          output_format: sarif
-          output_file_path: checkov.sarif
-          soft_fail: false
-      - uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
-        if: always()
-        with:
-          sarif_file: checkov.sarif
-          category: checkov
-
-  # Manifest security is executed by the central AppSec platform. The job id is part of the
-  # security gate contract in config/security-gate.yaml and does not change when the
-  # implementation moves.
-  manifest-lint:
-    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/manifest-security.yml@64931c9e44aef687853962895f5a74cfd9d80395
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/dependency-review.yml@d9694938ede6159cc4eea9d2e6f06ae819319592
     permissions:
       contents: read
     with:
-      platform_ref: 64931c9e44aef687853962895f5a74cfd9d80395
+      platform_ref: d9694938ede6159cc4eea9d2e6f06ae819319592
 
-  codeql:
-    needs: config
-    runs-on: ${{ matrix.runner }}
+  iac-checkov:
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/iac-security.yml@d9694938ede6159cc4eea9d2e6f06ae819319592
     permissions:
       contents: read
       security-events: write
-    strategy:
-      # One language having nothing to report must not cancel the analysis of another.
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.config.outputs.codeql_matrix) }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
+    with:
+      platform_ref: d9694938ede6159cc4eea9d2e6f06ae819319592
 
-      # source_present is decided in config/pipeline.yaml handling, from the files actually in
-      # the tree. A language configured before its source exists is a starter-template state.
-      # Analysis becomes mandatory again as soon as matching source appears, and any failure
-      # once it runs is a real failure.
-      - if: ${{ !matrix.source_present }}
-        run: echo "No ${{ matrix.language }} source in this repository yet. Analysis runs automatically once matching source is added."
+  manifest-lint:
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/manifest-security.yml@d9694938ede6159cc4eea9d2e6f06ae819319592
+    permissions:
+      contents: read
+    with:
+      platform_ref: d9694938ede6159cc4eea9d2e6f06ae819319592
 
-      - if: ${{ matrix.source_present }}
-        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build_mode }}
-          config-file: ./security/sast/codeql-config.yml
-      - if: ${{ matrix.source_present }}
-        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
-        with:
-          category: codeql-${{ matrix.language }}
+  codeql:
+    needs: config
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/code-scanning.yml@d9694938ede6159cc4eea9d2e6f06ae819319592
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      platform_ref: d9694938ede6159cc4eea9d2e6f06ae819319592
+      language_matrix: ${{ needs.config.outputs.codeql_matrix }}
 
   # The single check branch protection requires. Adding a job to this workflow means adding
   # it to needs below and to required_jobs in config/security-gate.yaml, or the gate cannot
@@ -238,15 +144,9 @@ jobs:
     needs: [config, unit-tests, secrets-scan, sca-trivy-fs, dependency-review, iac-checkov,
             manifest-lint, codeql]
     if: always()
-    runs-on: ubuntu-24.04
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/security-gate.yml@d9694938ede6159cc4eea9d2e6f06ae819319592
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - run: |
-          python3 -m pip install --quiet --require-hashes -r scripts/requirements-ci.txt
-          python3 scripts/security/evaluate-gate.py --needs "$NEEDS"
-        env:
-          NEEDS: ${{ toJSON(needs) }}
+    with:
+      platform_ref: d9694938ede6159cc4eea9d2e6f06ae819319592
+      needs: ${{ toJSON(needs) }}
