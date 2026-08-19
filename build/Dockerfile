@@ -25,14 +25,14 @@
 # Base images are pinned by tag. Pin them by digest before production use:
 # docker pull <image> && docker inspect --format '{{index .RepoDigests 0}}' <image>
 
-FROM node:24.18.0-trixie-slim AS build
+FROM node:26.7.0-trixie-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 
-FROM node:24.18.0-trixie-slim AS deps
+FROM node:26.7.0-trixie-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
