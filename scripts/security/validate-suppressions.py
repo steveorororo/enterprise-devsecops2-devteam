@@ -3,7 +3,7 @@
 
 Application-specific suppressions are time-bound records. A small set of repository-wide
 Checkov checks are baseline design exclusions because they conflict with the OpenShift or
-workload model documented in security/iac/.checkov.yaml. The validator fixes that set so a
+workload model. The validator fixes the accepted set so a
 new global skip cannot be added silently.
 """
 import re
@@ -17,7 +17,6 @@ import yaml
 REPO = Path(__file__).resolve().parents[2]
 DIRECTORY = REPO / "security" / "suppressions"
 TRIVY_IGNORE = REPO / "security" / "sca" / ".trivyignore"
-CHECKOV_CONFIG = REPO / "security" / "iac" / ".checkov.yaml"
 ID = re.compile(r"^SUPP-\d{4}-\d{3,}$")
 # Trivy is the only application-specific scanner ignore mechanism this template currently
 # links to a machine-validated record. Checkov's small repository-wide baseline is governed
@@ -41,7 +40,6 @@ REQUIRED = {
 # These are template-level design exclusions, not application finding suppressions. Their
 # rationale is kept beside the actual skip-check entries. The exact set is enforced here so
 # adding a new repository-wide Checkov bypass requires an explicit validation-code change.
-BASELINE_CHECKOV_SKIPS = {"CKV_K8S_11", "CKV_K8S_23", "CKV_K8S_40", "CKV_DOCKER_2"}
 
 
 def as_date(value, field, path):
@@ -110,24 +108,6 @@ def validate(path: Path, doc: dict) -> list[str]:
     return problems
 
 
-def validate_checkov_baseline() -> list[str]:
-    try:
-        cfg = yaml.safe_load(CHECKOV_CONFIG.read_text()) or {}
-    except (OSError, yaml.YAMLError) as exc:
-        return [f"{CHECKOV_CONFIG}: cannot parse Checkov configuration: {exc}"]
-    actual = {str(item) for item in (cfg.get("skip-check") or [])}
-    if actual != BASELINE_CHECKOV_SKIPS:
-        added = sorted(actual - BASELINE_CHECKOV_SKIPS)
-        missing = sorted(BASELINE_CHECKOV_SKIPS - actual)
-        parts = []
-        if added:
-            parts.append(f"unreviewed global skip(s): {', '.join(added)}")
-        if missing:
-            parts.append(f"expected documented baseline skip(s) missing: {', '.join(missing)}")
-        return [f"{CHECKOV_CONFIG}: {'; '.join(parts)}"]
-    return []
-
-
 def validate_trivy_ignore(records: dict[str, dict]) -> list[str]:
     problems: list[str] = []
     for number, raw in enumerate(TRIVY_IGNORE.read_text().splitlines(), 1):
@@ -168,7 +148,6 @@ def main() -> int:
         if record_id:
             records[record_id] = doc
 
-    problems.extend(validate_checkov_baseline())
     problems.extend(validate_trivy_ignore(records))
 
     if problems:

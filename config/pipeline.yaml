@@ -35,6 +35,9 @@ languages:
   # Swift uses a macOS runner. Go and java-kotlin use CodeQL autobuild. Other supported
   # languages use no-build extraction.
   #
+  # A language listed here is analysed once the repository contains source for it, so a
+  # language can be declared before the application code lands.
+  #
   # Keep actions in the list. It analyses the workflow files in this repository, so a
   # change that introduces an injection or an over-scoped token is caught by the same
   # mechanism that scans application code.

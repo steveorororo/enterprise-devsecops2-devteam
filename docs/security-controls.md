@@ -61,12 +61,31 @@ template creates no credentials and no jobs for any of them.
 | ZAP | Issue raised in this repository |
 | SBOM | Build artifact on the run, retained 90 days |
 
+## Where the controls run
+
+Pull request security controls execute in the central AppSec platform, called at the
+immutable commit recorded in `config/platform.yaml`. Scanner versions, artifact verification
+and shared policy are maintained there. This repository keeps what belongs to the
+application: which paths are scanned, which vulnerabilities have been accepted under
+`security/suppressions/`, and which optional controls are enabled in `config/pipeline.yaml`.
+
+The job ids in `config/security-gate.yaml` are unchanged by that move. They are the gate
+contract, and a control whose id changed would stop being evaluated while still reporting
+success. The platform additionally enforces a mandatory control set, so removing an entry
+from `config/security-gate.yaml` does not remove the control.
+
 ## How the gate decides
 
 Most scanners fail their own job when they exceed their threshold. The `gate` job turns those
 job results into the single required status check. CodeQL is handled differently: analysis can
 succeed while publishing alerts, so the branch ruleset's `code_scanning` rule enforces CodeQL
 alert severity separately.
+
+A configured CodeQL language is analysed once the repository contains source for it. Until
+then that language reports no analysis, so a repository does not fail its first pull request
+for having no application code yet. The first commit adding matching source makes analysis run
+again with no configuration change, and a failure from that point blocks the pull request.
+Workflow files are always present, so the `actions` language is always analysed.
 
 The `code_scanning` rule in `.github/rulesets/main-branch.json` names CodeQL only; it does not
 cover Trivy or Checkov, even though both also upload SARIF to the Security tab. Trivy and

@@ -80,6 +80,10 @@ a few README examples. There is no script for these, so edit them directly.
   alerts. Confirm the severity threshold with security owners before broad adoption. If the
   ruleset is absent under Settings, Rules, Rulesets, the repository was not fully initialized;
   see `docs/repository-bootstrap.md`.
+- **Turn off CodeQL default setup** under Settings, Code security, if it is enabled. This
+  template ships an advanced CodeQL configuration in `pr-validate.yml`, and GitHub rejects
+  advanced-configuration results while default setup is active, which fails the `codeql` job
+  and the gate.
 - **Enable Dependency graph, Dependabot alerts, and secret scanning with push protection**
   under Settings, Code security. The `dependency-review` job fails without the dependency
   graph, and Dependabot security updates require alerts to be on.
@@ -88,11 +92,18 @@ a few README examples. There is no script for these, so edit them directly.
   deadlock pull requests; the ruleset's code-owner requirement only applies where a real rule
   matches.
 
+## Platform release
+
+- **Do not hand edit `config/platform.yaml`.** It records the AppSec platform release this
+  repository executes. Automated update pull requests move the recorded version and every
+  pinned commit together, and the platform rejects a consumer where the two disagree.
+
 ## Security gates
 
 - **Agree the blocking severities** with your security owners. Critical and High is the
   starting position, not an agreed standard. Scanner thresholds live at their scanners;
-  CodeQL's High-or-higher threshold lives in `.github/rulesets/main-branch.json`.
+  CodeQL's High-or-higher threshold lives in `.github/rulesets/main-branch.json`. Scanner
+  thresholds that are the same for every consumer are maintained by the AppSec platform.
 - **Decide whether ignoring unfixed vulnerabilities is acceptable.** Both Trivy jobs run with
   `ignore-unfixed: true`. Open decision.
 - **Confirm `seccompProfile: RuntimeDefault` against your cluster's SCC.** The legacy

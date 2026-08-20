@@ -5,6 +5,7 @@ Application teams configure paths, build commands, CodeQL languages, the GitOps 
 optional controls here instead of editing workflow files.
 """
 import json
+import os
 import re
 import sys
 from pathlib import Path, PurePosixPath
@@ -33,6 +34,25 @@ CODEQL = {
     "rust": {"build_mode": "none", "runner": "ubuntu-24.04"},
     "swift": {"build_mode": "autobuild", "runner": "macos-15"},
 }
+
+# File extensions that decide whether a configured language has anything to analyse. A
+# language configured before its source exists is a starter-template state, not a finding, and
+# CodeQL has no mode that tolerates an empty database. Detection runs per pull request, so the
+# first commit that adds matching source makes that language's analysis mandatory again with
+# no configuration change.
+SOURCE_EXTENSIONS = {
+    "c-cpp": (".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp"),
+    "csharp": (".cs", ".cshtml", ".razor"),
+    "go": (".go",),
+    "java-kotlin": (".java", ".kt", ".kts"),
+    "javascript-typescript": (".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"),
+    "python": (".py",),
+    "ruby": (".erb", ".gemspec", ".rb"),
+    "rust": (".rs",),
+    "swift": (".swift",),
+}
+
+WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 
 
 def fail(message: str) -> None:
@@ -77,6 +97,29 @@ def safe_relative_path(name: str, value: str, *, must_exist: bool) -> str:
     return value
 
 
+def repository_extensions() -> set[str]:
+    """Extensions of every file in the working tree, excluding .git."""
+    found = set()
+    for _root, dirs, files in os.walk(REPO_ROOT):
+        dirs[:] = [name for name in dirs if name != ".git"]
+        for name in files:
+            suffix = os.path.splitext(name)[1].lower()
+            if suffix:
+                found.add(suffix)
+    return found
+
+
+def source_present(language: str, extensions: set[str]) -> bool:
+    # The whole working tree is searched rather than application.path, because application.path
+    # is still a placeholder in an unconfigured template and source added at the repository
+    # root would otherwise go unanalysed.
+    if language == "actions":
+        return WORKFLOWS.is_dir() and any(
+            path.suffix in {".yml", ".yaml"} for path in WORKFLOWS.iterdir() if path.is_file()
+        )
+    return bool(set(SOURCE_EXTENSIONS[language]) & extensions)
+
+
 def main() -> int:
     try:
         cfg = yaml.safe_load(CONFIG.read_text()) or {}
@@ -110,12 +153,14 @@ def main() -> int:
     if unknown:
         fail(f"unsupported CodeQL language(s) {unknown}. Supported: {sorted(CODEQL)}")
 
+    extensions = repository_extensions()
     matrix = {
         "include": [
             {
                 "language": language,
                 "build_mode": CODEQL[language]["build_mode"],
                 "runner": CODEQL[language]["runner"],
+                "source_present": source_present(language, extensions),
             }
             for language in languages
         ]
