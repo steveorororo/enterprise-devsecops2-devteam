@@ -8,5 +8,5 @@
 # executing its pinned commit until it adopts a new release.
 
 platform_repository: steveorororo/enterprise-devsecops2-appsec
-platform_version: "1.0.1"
-platform_ref: 1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+platform_version: "1.1.0"
+platform_ref: e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2

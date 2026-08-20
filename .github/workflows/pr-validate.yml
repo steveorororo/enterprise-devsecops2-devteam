@@ -82,21 +82,21 @@ jobs:
           BUILD_COMMAND: ${{ needs.config.outputs.build_compile }}
 
   secrets-scan:
-    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/secret-scanning.yml@1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/secret-scanning.yml@e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
     permissions:
       contents: read
     with:
-      platform_ref: 1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+      platform_ref: e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
 
   sca-trivy-fs:
     needs: config
     if: needs.config.outputs.trivy_fs_enabled == 'true' && needs.config.outputs.app_configured == 'true'
-    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/dependency-security.yml@1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/dependency-security.yml@e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
     permissions:
       contents: read
       security-events: write
     with:
-      platform_ref: 1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+      platform_ref: e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
       scan_path: ${{ needs.config.outputs.app_path }}
 
   # Compares the dependency manifests either side of the pull request and fails on a newly
@@ -106,35 +106,35 @@ jobs:
   # Requires Dependency graph to be enabled under Settings, Code security. The job fails
   # rather than skips if it is off, because a silently absent check is worse than a loud one.
   dependency-review:
-    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/dependency-review.yml@1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/dependency-review.yml@e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
     permissions:
       contents: read
     with:
-      platform_ref: 1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+      platform_ref: e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
 
   iac-checkov:
-    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/iac-security.yml@1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/iac-security.yml@e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
     permissions:
       contents: read
       security-events: write
     with:
-      platform_ref: 1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+      platform_ref: e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
 
   manifest-lint:
-    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/manifest-security.yml@1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/manifest-security.yml@e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
     permissions:
       contents: read
     with:
-      platform_ref: 1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+      platform_ref: e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
 
   codeql:
     needs: config
-    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/code-scanning.yml@1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/code-scanning.yml@e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
     permissions:
       contents: read
       security-events: write
     with:
-      platform_ref: 1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+      platform_ref: e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
       language_matrix: ${{ needs.config.outputs.codeql_matrix }}
 
   # The single check branch protection requires. Adding a job to this workflow means adding
@@ -144,9 +144,9 @@ jobs:
     needs: [config, unit-tests, secrets-scan, sca-trivy-fs, dependency-review, iac-checkov,
             manifest-lint, codeql]
     if: always()
-    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/security-gate.yml@1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+    uses: steveorororo/enterprise-devsecops2-appsec/.github/workflows/security-gate.yml@e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
     permissions:
       contents: read
     with:
-      platform_ref: 1eafb6dcfcc0010711f0fe5ebb8f4ecffc89eeb6
+      platform_ref: e1d7ee3190beb208d36c5cb7bc5a3747c33f0cd2
       needs: ${{ toJSON(needs) }}
